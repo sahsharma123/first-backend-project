@@ -235,11 +235,121 @@ const refreshAccessToken =asyncHandler(async(req,res)=>{
     
 })
 
+const changeCurrentPasswod= asyncHandler(async(req,res)=>{
+    const {oldPassword,newPassword}=req.body
+    //auth middleware se user object add kiye
+    const user=await User.findById(req.user?._id)
+    if(!user){
+        throw new ApiError(404,"User not found")
+    }
+    const isPasswordCorrect = await user.isPasswordCorrect(oldPassword)
+    if(!isPasswordCorrect){
+        throw new ApiError(400,"Old password is incorrect")
+    }
+    user.password=newPassword//pre hook se password hash ho jayega joki user model me define kiya hai
+    await user.save({validateBeforeSave: false})//validateBeforeSave false isliye kiya hai kyuki baaki fields ko validate nahi karna hai
+    return res.status(200)
+    .json(new ApiResponse(200,{}, "Password changed successfully"))
+})
+
+const getCurrentUser = asyncHandler(async(req,res)=>{
+    //auth middleware se user object add kiye isliye agar user login hai to user object milega
+  
+    return res.status(200)
+    .json(200,req.user,"Current user fetched successfully")
+})
+
+const updateAccountDetails = asyncHandler(async(req,res)=>{
+    const {fullName,email}=req.body
+    if(!fullName || !email){
+        throw new ApiError(400,"Full name and email are required")
+    }
+  
+    const user =await User.findById(req.user?._id,
+        {//$set operator is used to update the fields
+        $set:{
+            fullName,//fullName is coming from req.body when user is updating account details from frontend
+            email
+        }
+    },
+    {new:true}//new:true is used to return the updated document
+).select("-password")
+
+return res.status(200)
+.json(new ApiResponse(200,user,"Account details updated successfully"))
+  
+})
+
+//to update files like avatar we have to use multer middleware in routes
+
+const updateAvatar = asyncHandler(async(req,res)=>{
+    const  avatarLocalPath=req.file?.path
+    if(!avatarLocalPath){
+        throw new ApiError(400,"Avatar file is required")
+    }
+    const avatar =await  uploadOnCloudinary(avatarLocalPath)
+
+    if(!avatar.url){
+        throw new ApiError(400,"error while uploading Avatar file to cloudinary")
+    }
+
+    const user = await User.findByIdAndUpdate(
+        req.user?._id,
+        {
+            $set:{
+                avatar:avatar.url
+            }
+        },
+        {
+            new:true
+        }
+    ).select("-password")
+
+    return res.status(200)
+    .json(new ApiResponse(200,user,"Avatar updated successfully"))
+
+
+})
+
+const updateCoverImage = asyncHandler(async(req,res)=>{
+    const coverImageLocalPath=req.file?.path
+    if(!coverImageLocalPath){
+        throw new ApiError(400,"Cover image file is required")
+    }
+    const coverImage =await uploadOnCloudinary(coverImageLocalPath)
+
+    if(!coverImage.url){
+        throw new ApiError(400,"error while uploading cover image file to cloudinary")
+    }
+
+    const user=await User.findByIdAndUpdate(
+        req.user?._id,
+        {
+            $set:{
+                coverImage:coverImage.url
+            }
+        },
+        {
+            new:true
+        }
+    ).select("-password")
+
+    return res.status(200)
+    .json(new ApiResponse(200,user,"Cover image updated successfully")) 
+
+
+}
+
+)
 
 export { 
     registerUser,
     loginUser,
     logoutUser,
- refreshAccessToken
-
+    refreshAccessToken,
+    changeCurrentPasswod,
+    getCurrentUser,
+    updateAccountDetails,
+    updateAvatar,
+    updateCoverImage
  }
